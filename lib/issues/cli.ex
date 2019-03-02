@@ -2,21 +2,48 @@ defmodule Issues.CLI do
     @default_count 4
 
     def run(argv) do
-        parse_args(argv)
+        argv
+        |> parse_args
+        |> process
     end
 
     def parse_args(argv) do
-        parse = OptionParser.parse(argv, switches: [help: :boolean], alias: [h: :help])
+        OptionParser.parse(argv, switches: [help: :boolean], alias: [h: :help])
+        |> elem(1)
+        |> args_to_internal_representation
+    end
 
-        case parse do
-            {[help: true], _, _} 
-                -> :help
-            {_, [user, project, count], _}
-                -> {user, project, 
-                        String.to_integer(count)}
-            {_, [user, project], _}
-                -> {user, project, @default_count}
-            _ -> :help
-        end
+    def args_to_internal_representation([user, project, count]) do
+       {user, project, String.to_integer(count)} 
+    end 
+
+    def args_to_internal_representation([user, project]) do
+        {user, project, @default_count}
+    end
+
+    def args_to_internal_representation(_) do
+        :help
+    end
+
+    def process(:help) do
+        IO.puts """
+        usage: issues  <user> <project> [count | @default_count] 
+        """
+
+        System.halt(0)
+    end
+
+    def process({user, project, _count}) do
+        Issues.GithubIssues.fetch(user, project)
+        |> decode_response
+    end
+
+    def decode_response({:ok, body}) do
+        body
+    end
+
+    def decode_response({:error, error}) do
+        IO.puts "Error fetching from github: #{error["message"]}"
+        System.halt(2)
     end
 end
